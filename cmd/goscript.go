@@ -89,7 +89,7 @@ func copyFile(dest, src string) {
 func run(cmd string, args []string, dir string) {
 	// Execute the command
 	process, err := exec.Run(cmd, args, ENVIRON, dir,
-		exec.DevNull, exec.PassThrough, exec.PassThrough)
+		exec.PassThrough, exec.PassThrough, exec.PassThrough)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Could not execute: \"%s\"\n",
 			strings.Join(args, " "))
@@ -127,6 +127,13 @@ func main() {
 		os.Exit(EXIT_CODE)
 	}
 
+	// === Try to call executable
+	executable := sourceFile[:len(sourceFile)-4] + ".goc"
+	if _, err := os.Stat(executable); err == nil {
+		run(executable, []string{path.Base(executable)}, "")
+		os.Exit(0)
+	}
+
 	// === Copy to temporary file
 	tempDir := os.TempDir()
 	destFile := path.Join(tempDir, baseSourceFile)
@@ -142,9 +149,8 @@ func main() {
 	// Get extensions
 	objectFile := baseSourceFile[:len(baseSourceFile)-4] + "." + archExt
 	objectFile = path.Join(tempDir, objectFile)
-	outputFile := sourceFile[:len(sourceFile)-4] + ".goc"
 
-	cmdArgs = []string{path.Base(linker), "-o", outputFile, objectFile}
+	cmdArgs = []string{path.Base(linker), "-o", executable, objectFile}
 	run(linker, cmdArgs, "")
 
 	// === Cleaning
@@ -155,7 +161,6 @@ func main() {
 		}
 	}
 
-	println("OK")
-//	os.Exit(0)
+	run(executable, []string{path.Base(executable)}, "")
 }
 
