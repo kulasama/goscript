@@ -118,24 +118,24 @@ func main() {
 		return
 	}
 
-	// === Check script extension
 	sourceFile := args[1] // Relative path
-	baseSourceFile := path.Base(sourceFile)
-
-	if path.Ext(sourceFile) != ".gos" {
-		fmt.Fprintf(os.Stderr, "Wrong extension! It has to be \".gos\"\n")
-		os.Exit(EXIT_CODE)
-	}
-
-	// === Try to call executable
 	executable := sourceFile[:len(sourceFile)-4] + ".goc"
+
+	// === Try to call to the executable
 	if _, err := os.Stat(executable); err == nil {
 		run(executable, []string{path.Base(executable)}, "")
 		os.Exit(0)
 	}
 
+	// === Check script extension
+	if path.Ext(sourceFile) != ".gos" {
+		fmt.Fprintf(os.Stderr, "Wrong extension! It has to be \".gos\"\n")
+		os.Exit(EXIT_CODE)
+	}
+
 	// === Copy to temporary file
 	tempDir := os.TempDir()
+	baseSourceFile := path.Base(sourceFile)
 	destFile := path.Join(tempDir, baseSourceFile)
 	copyFile(destFile, sourceFile)
 
@@ -146,7 +146,7 @@ func main() {
 	cmdArgs := []string{path.Base(compiler), baseSourceFile}
 	run(compiler, cmdArgs, tempDir)
 
-	// Get extensions
+	// Get the linker extension
 	objectFile := baseSourceFile[:len(baseSourceFile)-4] + "." + archExt
 	objectFile = path.Join(tempDir, objectFile)
 
