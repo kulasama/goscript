@@ -29,6 +29,10 @@ Insert at the first line of the Go Script:
 
 	#!/usr/bin/env goscript
 
+And set its executable bit:
+
+	$ chmod +x file.g
+
 
 ## Copyright and licensing
 
