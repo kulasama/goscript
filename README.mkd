@@ -5,8 +5,8 @@ goscript
 Go scripts has to be ".g".
 
 Internally, it compiles the script file to an hidden binary with extension
-".goc", then it's runned. If that binary does not exist or its modified time is
-different than script's, then it's compiled again.
+".gosc" (Go Script Compiled), then it's runned. If that binary does not exist or
+its modified time is different than script's, then it's compiled again.
 
 The use of Go scripts is especially useful:
 
