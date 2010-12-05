@@ -33,6 +33,20 @@ And set its executable bit:
 
 	$ chmod +x file.g
 
+An example of Go script:
+
+	#!/usr/bin/env goscript
+
+	package main
+
+	import (
+		"fmt"
+	)
+
+	func main() {
+		fmt.Println("Take it on the other side")
+	}
+
 
 ## Copyright and licensing
 
