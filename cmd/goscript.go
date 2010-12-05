@@ -125,21 +125,21 @@ func main() {
 	sourceFile := args[1] // Relative path
 
 	// The executable is an hidden file.
-	execFile := sourceFile[:len(sourceFile)-4] + ".goc"
+	execFile := sourceFile[:len(sourceFile)-2] + ".goc"
 	{
 		dir, file := path.Split(execFile)
 		execFile = path.Join(dir, "."+file)
 	}
 
-	// === Try to call to the executable
+	// === Run the executable, if exist
 	if _, err := os.Stat(execFile); err == nil {
 		run(execFile, []string{path.Base(execFile)}, "")
 		os.Exit(0)
 	}
 
 	// === Check script extension
-	if path.Ext(sourceFile) != ".gos" {
-		fmt.Fprintf(os.Stderr, "Wrong extension! It has to be \".gos\"\n")
+	if path.Ext(sourceFile) != ".g" {
+		fmt.Fprintf(os.Stderr, "Wrong extension! It has to be \".g\"\n")
 		os.Exit(EXIT_CODE)
 	}
 
@@ -157,7 +157,7 @@ func main() {
 	run(compiler, cmdArgs, tempDir)
 
 	// Get the linker extension
-	objectFile := baseSourceFile[:len(baseSourceFile)-4] + "." + archExt
+	objectFile := baseSourceFile[:len(baseSourceFile)-2] + "." + archExt
 	objectFile = path.Join(tempDir, objectFile)
 
 	cmdArgs = []string{path.Base(linker), "-o", execFile, objectFile}
