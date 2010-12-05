@@ -7,7 +7,6 @@ package main
 import (
 	"exec"
 	"fmt"
-	"io"
 	"os"
 	"path"
 	"runtime"
@@ -33,7 +32,7 @@ func toolchain() (compiler, linker, archExt string) {
 		goroot = os.Getenv("GOROOT_FINAL")
 		if goroot == "" {
 			fmt.Fprintf(os.Stderr, "Environment variable GOROOT neither"+
-				" GOROOT_FINAL is set\n")
+				" GOROOT_FINAL has been set\n")
 			os.Exit(EXIT_CODE)
 		}
 	}
@@ -60,33 +59,29 @@ func toolchain() (compiler, linker, archExt string) {
 	return
 }
 
-// Copies the file `sourceFile` to a temporary directory.
-func copyFile(dest, src string) {
-	outFile, err := os.Open(dest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+// Comment or comment out the interpreter line.
+func comment(filename string, ok bool) {
+	file, err := os.Open(filename, os.O_WRONLY, 0)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could not create: %s\n", err)
-		os.Exit(EXIT_CODE)
+		goto _error
 	}
-	defer outFile.Close()
+	defer file.Close()
 
-	inFile, err := os.Open(src, os.O_RDONLY, 0)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could not read: %s\n", err)
-		os.Exit(EXIT_CODE)
-	}
-
-	// === Copy file
-	_, err = io.WriteString(outFile, "//") // To comment the line interpreter.
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could not write: %s\n", err)
-		os.Exit(EXIT_CODE)
+	if ok {
+		if _, err = file.Write([]byte("//")); err != nil {
+			goto _error
+		}
+	} else {
+		if _, err = file.Write([]byte("#!")); err != nil {
+			goto _error
+		}
 	}
 
-	_, err = io.Copy(outFile, inFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could not copy: %s\n", err)
-		os.Exit(EXIT_CODE)
-	}
+	return
+
+_error:
+	fmt.Fprintf(os.Stderr, "Could not write: %s\n", err)
+	os.Exit(EXIT_CODE)
 }
 
 // Executes commands.
@@ -123,17 +118,14 @@ func main() {
 	}
 
 	sourceFile := args[1] // Relative path
-
+	sourceDir, baseSourceFile := path.Split(sourceFile)
 	// The executable is an hidden file.
-	execFile := sourceFile[:len(sourceFile)-2] + ".goc"
-	{
-		dir, file := path.Split(execFile)
-		execFile = path.Join(dir, "."+file)
-	}
+	baseExecFile := "." + baseSourceFile[:len(baseSourceFile)-2] + ".goc"
+	execFile := path.Join(sourceDir, baseExecFile)
 
 	// === Run the executable, if exist
 	if _, err := os.Stat(execFile); err == nil {
-		run(execFile, []string{path.Base(execFile)}, "")
+		run(execFile, []string{baseExecFile}, "")
 		os.Exit(0)
 	}
 
@@ -143,34 +135,28 @@ func main() {
 		os.Exit(EXIT_CODE)
 	}
 
-	// === Copy to temporary file
-	tempDir := os.TempDir()
-	baseSourceFile := path.Base(sourceFile)
-	destFile := path.Join(tempDir, baseSourceFile)
-	copyFile(destFile, sourceFile)
-
-	// === Execute commands
+	// === Compile and link
+	comment(sourceFile, true)
 	compiler, linker, archExt := toolchain()
+
 	ENVIRON = os.Environ()
+	objectFile := "_go_." + archExt
 
-	cmdArgs := []string{path.Base(compiler), baseSourceFile}
-	run(compiler, cmdArgs, tempDir)
+	cmdArgs := []string{path.Base(compiler), "-o", objectFile, baseSourceFile}
+	run(compiler, cmdArgs, sourceDir)
 
-	// Get the linker extension
-	objectFile := baseSourceFile[:len(baseSourceFile)-2] + "." + archExt
-	objectFile = path.Join(tempDir, objectFile)
-
-	cmdArgs = []string{path.Base(linker), "-o", execFile, objectFile}
-	run(linker, cmdArgs, "")
+	cmdArgs = []string{path.Base(linker), "-o", baseExecFile, objectFile}
+	run(linker, cmdArgs, sourceDir)
 
 	// === Cleaning
-	for _, file := range []string{destFile, objectFile} {
-		if err := os.Remove(file); err != nil {
-			fmt.Fprintf(os.Stderr, "Could not remove: %s\n", err)
-			os.Exit(EXIT_CODE)
-		}
-	}
+	comment(sourceFile, false)
 
-	run(execFile, []string{path.Base(execFile)}, "")
+	if err := os.Remove(path.Join(sourceDir, objectFile)); err != nil {
+		fmt.Fprintf(os.Stderr, "Could not remove: %s\n", err)
+		os.Exit(EXIT_CODE)
+	}
+	// ===
+
+	run(execFile, []string{baseExecFile}, "")
 }
 
