@@ -1,6 +1,11 @@
-// TODO: The executable file will be hidden in Windows when Go can access to
-// this Win32 API:
-// http://msdn.microsoft.com/en-us/library/aa365535%28VS.85%29.aspx
+// Copyright 2010  The "goscript" Authors
+//
+// Use of this source code is governed by the Simplified BSD License
+// that can be found in the LICENSE file.
+//
+// This software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
+// OR CONDITIONS OF ANY KIND, either express or implied. See the License
+// for more details.
 
 package main
 
