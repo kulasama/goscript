@@ -18,6 +18,76 @@ const EXIT_CODE = 2
 var ENVIRON []string
 
 
+// Base to access to "mtime" of given file.
+func _time(filename string, mtime int64) int64 {
+	info, err := os.Stat(filename)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Could not access: %s\n", err)
+		os.Exit(EXIT_CODE)
+	}
+	
+	if mtime != 0 {
+		info.Mtime_ns = mtime
+		return 0
+	}
+	return info.Mtime_ns
+}
+
+func getTime(filename string) int64 {
+	return _time(filename, 0)
+}
+
+func setTime(filename string, mtime int64) {
+	_time(filename, mtime)
+}
+
+// Comments or comments out the line interpreter.
+func comment(filename string, ok bool) {
+	file, err := os.Open(filename, os.O_WRONLY, 0)
+	if err != nil {
+		goto _error
+	}
+	defer file.Close()
+
+	if ok {
+		if _, err = file.Write([]byte("//")); err != nil {
+			goto _error
+		}
+	} else {
+		if _, err = file.Write([]byte("#!")); err != nil {
+			goto _error
+		}
+	}
+
+	return
+
+_error:
+	fmt.Fprintf(os.Stderr, "Could not write: %s\n", err)
+	os.Exit(EXIT_CODE)
+}
+
+// Executes a command and returns its exit code.
+func run(cmd string, args []string, dir string) int {
+	// Execute the command
+	process, err := exec.Run(cmd, args, ENVIRON, dir,
+		exec.PassThrough, exec.PassThrough, exec.PassThrough)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Could not execute: \"%s\"\n",
+			strings.Join(args, " "))
+		os.Exit(EXIT_CODE)
+	}
+
+	// Wait for command completion
+	message, err := process.Wait(0)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Could not wait for: \"%s\"\n",
+			strings.Join(args, " "))
+		os.Exit(EXIT_CODE)
+	}
+
+	return message.ExitStatus()
+}
+
 // Gets the toolchain.
 func toolchain() (compiler, linker, archExt string) {
 	arch_ext := map[string]string{
@@ -59,56 +129,6 @@ func toolchain() (compiler, linker, archExt string) {
 	return
 }
 
-// Comment or comment out the interpreter line.
-func comment(filename string, ok bool) {
-	file, err := os.Open(filename, os.O_WRONLY, 0)
-	if err != nil {
-		goto _error
-	}
-	defer file.Close()
-
-	if ok {
-		if _, err = file.Write([]byte("//")); err != nil {
-			goto _error
-		}
-	} else {
-		if _, err = file.Write([]byte("#!")); err != nil {
-			goto _error
-		}
-	}
-
-	return
-
-_error:
-	fmt.Fprintf(os.Stderr, "Could not write: %s\n", err)
-	os.Exit(EXIT_CODE)
-}
-
-// Executes commands.
-func run(cmd string, args []string, dir string) {
-	// Execute the command
-	process, err := exec.Run(cmd, args, ENVIRON, dir,
-		exec.PassThrough, exec.PassThrough, exec.PassThrough)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could not execute: \"%s\"\n",
-			strings.Join(args, " "))
-		os.Exit(EXIT_CODE)
-	}
-
-	// Wait for command completion
-	message, err := process.Wait(0)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could not wait for: \"%s\"\n",
-			strings.Join(args, " "))
-		os.Exit(EXIT_CODE)
-	}
-
-	// Exit if it has failed
-	if exitCode := message.ExitStatus(); exitCode != 0 {
-		os.Exit(exitCode)
-	}
-}
-
 
 func main() {
 	args := os.Args
@@ -123,10 +143,14 @@ func main() {
 	baseExecFile := "." + baseSourceFile[:len(baseSourceFile)-2] + ".goc"
 	execFile := path.Join(sourceDir, baseExecFile)
 
-	// === Run the executable, if exist
+	// === Run the executable, if exist and it has not been modified
 	if _, err := os.Stat(execFile); err == nil {
-		run(execFile, []string{baseExecFile}, "")
-		os.Exit(0)
+		sourceMtime := getTime(sourceFile)
+		execMtime := getTime(execFile)
+
+		if sourceMtime == execMtime {
+			goto _run
+		}
 	}
 
 	// === Check script extension
@@ -136,6 +160,7 @@ func main() {
 	}
 
 	// === Compile and link
+	sourceMtime := getTime(sourceFile)
 	comment(sourceFile, true)
 	compiler, linker, archExt := toolchain()
 
@@ -143,13 +168,21 @@ func main() {
 	objectFile := "_go_." + archExt
 
 	cmdArgs := []string{path.Base(compiler), "-o", objectFile, baseSourceFile}
-	run(compiler, cmdArgs, sourceDir)
+	exitCode := run(compiler, cmdArgs, sourceDir)
+	comment(sourceFile, false)
+	if exitCode != 0 {
+		os.Exit(exitCode)
+	}
 
 	cmdArgs = []string{path.Base(linker), "-o", baseExecFile, objectFile}
-	run(linker, cmdArgs, sourceDir)
+	if exitCode = run(linker, cmdArgs, sourceDir); exitCode != 0 {
+		os.Exit(exitCode)
+	}
 
 	// === Cleaning
-	comment(sourceFile, false)
+	// Set mtime of executable just like the source file
+	setTime(sourceFile, sourceMtime)
+	setTime(execFile, sourceMtime)
 
 	if err := os.Remove(path.Join(sourceDir, objectFile)); err != nil {
 		fmt.Fprintf(os.Stderr, "Could not remove: %s\n", err)
@@ -157,6 +190,8 @@ func main() {
 	}
 	// ===
 
-	run(execFile, []string{baseExecFile}, "")
+_run:
+	exitCode = run(execFile, []string{baseExecFile}, "")
+	os.Exit(exitCode)
 }
 
