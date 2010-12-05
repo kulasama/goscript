@@ -1,3 +1,7 @@
+// TODO: The executable file will be hidden in Windows when Go can access to
+// this Win32 API:
+// http://msdn.microsoft.com/en-us/library/aa365535%28VS.85%29.aspx
+
 package main
 
 import (
@@ -119,11 +123,17 @@ func main() {
 	}
 
 	sourceFile := args[1] // Relative path
-	executable := sourceFile[:len(sourceFile)-4] + ".goc"
+
+	// The executable is an hidden file.
+	execFile := sourceFile[:len(sourceFile)-4] + ".goc"
+	{
+		dir, file := path.Split(execFile)
+		execFile = path.Join(dir, "."+file)
+	}
 
 	// === Try to call to the executable
-	if _, err := os.Stat(executable); err == nil {
-		run(executable, []string{path.Base(executable)}, "")
+	if _, err := os.Stat(execFile); err == nil {
+		run(execFile, []string{path.Base(execFile)}, "")
 		os.Exit(0)
 	}
 
@@ -150,7 +160,7 @@ func main() {
 	objectFile := baseSourceFile[:len(baseSourceFile)-4] + "." + archExt
 	objectFile = path.Join(tempDir, objectFile)
 
-	cmdArgs = []string{path.Base(linker), "-o", executable, objectFile}
+	cmdArgs = []string{path.Base(linker), "-o", execFile, objectFile}
 	run(linker, cmdArgs, "")
 
 	// === Cleaning
@@ -161,6 +171,6 @@ func main() {
 		}
 	}
 
-	run(executable, []string{path.Base(executable)}, "")
+	run(execFile, []string{path.Base(execFile)}, "")
 }
 
