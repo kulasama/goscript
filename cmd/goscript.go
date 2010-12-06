@@ -138,7 +138,7 @@ func toolchain() (compiler, linker, archExt string) {
 func main() {
 	args := os.Args
 	if len(args) != 2 {
-		fmt.Println(`Usage: Insert "#!/usr/bin/env goscript" in your Go script`)
+		fmt.Println(`Usage: goscript test.go`)
 		return
 	}
 
@@ -159,14 +159,14 @@ func main() {
 	}
 
 	// === Check script extension
-	if path.Ext(sourceFile) != ".g" {
-		fmt.Fprintf(os.Stderr, "Wrong extension! It has to be \".g\"\n")
+	if path.Ext(sourceFile) != ".go" {
+		fmt.Fprintf(os.Stderr, "Wrong extension! It has to be \".go\"\n")
 		os.Exit(EXIT_CODE)
 	}
 
 	// === Compile and link
 	sourceMtime := getTime(sourceFile)
-	comment(sourceFile, true)
+	//comment(sourceFile, true)
 	compiler, linker, archExt := toolchain()
 
 	ENVIRON = os.Environ()
